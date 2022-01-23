@@ -29,17 +29,16 @@ class Encoder(nn.Module):
         self.__lstm1 = nn.LSTM(
             input_size=input_dims,
             hidden_size=lstm_hidden_dims1,
-            num_layers=2,
-            dropout=0.2,
+            bidirectional=True,
             batch_first=True,
         )
         self.__lstm2 = nn.LSTM(
-            input_size=lstm_hidden_dims1,
+            input_size=2*lstm_hidden_dims1,
             hidden_size=lstm_hidden_dims2,
-            num_layers=2,
-            dropout=0.2,
+            bidirectional=True,
             batch_first=True,
         )
+        self.__fc = nn.Linear(2*lstm_hidden_dims2, lstm_hidden_dims2)
         self.__fc_mean = nn.Linear(lstm_hidden_dims2, latent_dims)
         self.__fc_log_var = nn.Linear(lstm_hidden_dims2, latent_dims)
 
@@ -48,7 +47,7 @@ class Encoder(nn.Module):
 
     def __sampling(self, z_mean, z_log_var):
         epsilon = torch.normal(0, 1, size=(z_mean.shape)).to(self.__device)
-        return z_mean + torch.exp(z_log_var)*epsilon
+        return z_mean + torch.exp(z_log_var/2)*epsilon
 
     def forward(self, x):
         '''
@@ -58,7 +57,12 @@ class Encoder(nn.Module):
         x, _ = self.__lstm1(x)
         x = nn.functional.dropout(x, p=0.2)
         _, (x, _) = self.__lstm2(x)
-        x = x[1]
+        x = nn.functional.dropout(x, p=0.2)
+        x = torch.permute(x, (1,0,2))
+        x = torch.reshape(x, (x.shape[0], -1))
+        x = self.__fc(x)
+        x = nn.functional.relu(x)
+        x = nn.functional.dropout(x, p=0.2)
         z_mean = self.__fc_mean(x)
         z_log_var = self.__fc_log_var(x)
         z = self.__sampling(z_mean, z_log_var)
@@ -76,17 +80,10 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.__lstm1 = nn.LSTM(
             input_size=latent_dims,
-            hidden_size=latent_dims,
-            num_layers=2,
-            dropout=0.2,
-            batch_first=True,
-        )
-        self.__lstm2 = nn.LSTM(
-            input_size=latent_dims,
             hidden_size=lstm_hidden_dims1,
             batch_first=True,
         )
-        self.__lstm3 = nn.LSTM(
+        self.__lstm2 = nn.LSTM(
             input_size=lstm_hidden_dims1,
             hidden_size=lstm_hidden_dims2,
             batch_first=True,
@@ -97,29 +94,30 @@ class Decoder(nn.Module):
         self.__sequence_length = sequence_length
         self.__device = device
 
-    def __lstm1_forward(self, x):
-        '''
-        x: [batchsize, features]
-        '''
-        x = torch.unsqueeze(x, dim=1)
-        hidden = None
-        out = list()
-        for _ in range(self.__sequence_length):
-            x, hidden = self.__lstm1(x, hidden)
-            out.append(x)
-        x = torch.cat(out, dim=1)
-        return x
+    # def __lstm1_forward(self, x):
+    #     '''
+    #     x: [batchsize, features]
+    #     '''
+    #     x = torch.unsqueeze(x, dim=1)
+    #     hidden = None
+    #     out = list()
+    #     for _ in range(self.__sequence_length):
+    #         x, hidden = self.__lstm1(x, hidden)
+    #         out.append(x)
+    #     x = torch.cat(out, dim=1)
+    #     return x
 
     def forward(self, x):
         '''
         x: [batchsize, features]
         '''
         x = x.to(self.__device)
-        x = self.__lstm1_forward(x)
+        x = torch.unsqueeze(x, dim=1)
+        x = x.repeat((1, self.__sequence_length, 1))
+        x, _ = self.__lstm1(x)
         x = nn.functional.dropout(x, p=0.2)
         x, _ = self.__lstm2(x)
         x = nn.functional.dropout(x, p=0.2)
-        x, _ = self.__lstm3(x)
         x = self.__fc(x)
         x = torch.nn.functional.softmax(x, dim=2)
         return x
