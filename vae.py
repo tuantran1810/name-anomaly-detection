@@ -76,16 +76,19 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.__lstm1 = nn.LSTM(
             input_size=latent_dims,
-            hidden_size=lstm_hidden_dims1,
+            hidden_size=latent_dims,
             num_layers=2,
             dropout=0.2,
             batch_first=True,
         )
         self.__lstm2 = nn.LSTM(
+            input_size=latent_dims,
+            hidden_size=lstm_hidden_dims1,
+            batch_first=True,
+        )
+        self.__lstm3 = nn.LSTM(
             input_size=lstm_hidden_dims1,
             hidden_size=lstm_hidden_dims2,
-            num_layers=2,
-            dropout=0.2,
             batch_first=True,
         )
         self.__fc = nn.Linear(lstm_hidden_dims2, output_dims)
@@ -94,19 +97,31 @@ class Decoder(nn.Module):
         self.__sequence_length = sequence_length
         self.__device = device
 
+    def __lstm1_forward(self, x):
+        '''
+        x: [batchsize, features]
+        '''
+        x = torch.unsqueeze(x, dim=1)
+        hidden = None
+        out = list()
+        for _ in range(self.__sequence_length):
+            x, hidden = self.__lstm1(x, hidden)
+            out.append(x)
+        x = torch.cat(out, dim=1)
+        return x
+
     def forward(self, x):
         '''
         x: [batchsize, features]
         '''
         x = x.to(self.__device)
-        x = x.unsqueeze(dim=1)
-        x = x.repeat(1, self.__sequence_length, 1)
-        x, _ = self.__lstm1(x)
+        x = self.__lstm1_forward(x)
         x = nn.functional.dropout(x, p=0.2)
         x, _ = self.__lstm2(x)
-        # x = nn.functional.relu(x)
+        x = nn.functional.dropout(x, p=0.2)
+        x, _ = self.__lstm3(x)
         x = self.__fc(x)
-        x = nn.functional.softmax(x, dim=2)
+        x = torch.nn.functional.softmax(x, dim=2)
         return x
 
 class LSTMVariationalAutoencoder(nn.Module):

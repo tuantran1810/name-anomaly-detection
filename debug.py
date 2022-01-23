@@ -18,6 +18,14 @@ lstm_hidden_dims2 = 64
 latent_dims = 32
 device = 'cpu'
 
+def tensor_to_string(keyidx, tensor):
+    out = list()
+    idx = np.argmax(tensor, axis=0)
+    for i in idx:
+        c = keyidx[i]
+        out.append(c)
+    return ''.join(out)
+
 def main():
     all_names = None
     keymap = None
@@ -52,31 +60,13 @@ def main():
     vae.load(folder='./model/celoss')
     vae.eval()
 
-    results = list()
-    all_strings = list()
-    for s, x in tqdm(dataloader):
-        with torch.no_grad():
-            out, _, _, _ = vae(x)
-            loss = nn.functional.l1_loss(out, x, reduction='none')
-            loss = loss.detach().cpu().numpy()
-            loss = np.mean(loss, axis=(1,2))
-            results.append(loss)
-            all_strings.extend(s)
-    results = np.concatenate(results, axis=0)
-
-    items = list()
-    for i in range(len(results)):
-        result = results[i]
-        string = all_strings[i]
-        items.append({'name': string, 'loss': result})
-    items = sorted(items, key=lambda x: x['loss'], reverse=True)
-
-    with open('./test_result.csv', 'w', newline='') as fd:
-        fields = ['name', 'loss']
-        writer = csv.DictWriter(fd, fieldnames=fields)
-        writer.writeheader()
-        for item in items:
-            writer.writerow(item)
+    string = "tuấn nè"
+    string, tensor = tensor_maker.make(string)
+    tensor = torch.unsqueeze(tensor, dim=0)
+    with torch.no_grad():
+        out, _, _, _ = vae(tensor)
+    out = out.detach().cpu().numpy()
+    print(tensor_to_string(keyidx, out[0]))
 
 if __name__ == '__main__':
     main()
