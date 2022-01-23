@@ -15,6 +15,7 @@ class VAETrainer():
         strings_pkl_path='./name.pkl',
         keymap_pkl_path='./keymap.pkl',
         output_model_path='./model',
+        log_dir='./log',
         sequence_length = 30,
         feature_dims=100,
         lstm_hidden_dims1=128,
@@ -59,7 +60,7 @@ class VAETrainer():
 
         self.__output_model_path = output_model_path
         self.__device = device
-        self.__writer = SummaryWriter(log_dir='log')
+        self.__writer = SummaryWriter(log_dir=log_dir)
 
     def train(self, epochs=10):
         print(f"start training, {epochs} epochs")
