@@ -13,9 +13,9 @@ from tqdm import tqdm
 
 sequence_length = 30
 feature_dims = 100
-lstm_hidden_dims1 = 64
-lstm_hidden_dims2 = 32
-latent_dims = 16
+lstm_hidden_dims1 = 128
+lstm_hidden_dims2 = 64
+latent_dims = 32
 device = 'cpu'
 
 def main():
@@ -46,7 +46,7 @@ def main():
         latent_dims=latent_dims,
         device='cpu',
     )
-    vae.load(folder='./model/3')
+    vae.load(folder='./model/celoss')
     vae.eval()
 
     results = list()
