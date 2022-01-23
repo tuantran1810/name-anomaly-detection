@@ -135,6 +135,7 @@ class LSTMVariationalAutoencoder(nn.Module):
             device=device,
         )
         self.__device = device
+        self.to(device)
 
     def forward(self, x):
         '''
