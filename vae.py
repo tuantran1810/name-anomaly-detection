@@ -47,7 +47,7 @@ class Encoder(nn.Module):
         self.__device = device
 
     def __sampling(self, z_mean, z_log_var):
-        epsilon = torch.normal(0, 1, size=(z_mean.shape))
+        epsilon = torch.normal(0, 1, size=(z_mean.shape)).to(self.__device)
         return z_mean + torch.exp(z_log_var)*epsilon
 
     def forward(self, x):
