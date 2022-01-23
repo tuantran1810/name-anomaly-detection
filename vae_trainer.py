@@ -74,11 +74,11 @@ class VAETrainer():
                 x = x.to(self.__device)
                 self.__optim.zero_grad()
                 yhat, z, z_mean, z_log_var = self.__vae(x)
-                loss, bce, kl = vae_loss(x, yhat, z_mean, z_log_var)
+                loss, cross_entropy, kl = vae_loss(x, yhat, z_mean, z_log_var)
                 loss.backward()
                 self.__optim.step()
                 self.__writer.add_scalar('training_loss/total', loss, ipoint)
-                self.__writer.add_scalar('training_loss/bce', bce, ipoint)
+                self.__writer.add_scalar('training_loss/cross_entropy', cross_entropy, ipoint)
                 self.__writer.add_scalar('training_loss/kl', kl, ipoint)
 
             self.__vae.eval()

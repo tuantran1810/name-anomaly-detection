@@ -13,9 +13,9 @@ def vae_loss(x, yhat, z_mean, z_log_var):
     batchsize, chars, features = x.shape
     x = torch.reshape(x, (batchsize, chars*features))
     yhat = torch.reshape(yhat, (batchsize, -1))
-    bce = nn.functional.binary_cross_entropy(yhat, x)
+    cross_entropy_loss = nn.functional.cross_entropy(yhat, x)
     kl_divergence = -0.5 * torch.sum(1 + z_log_var - torch.square(z_mean) - torch.exp(z_log_var))
-    return bce + kl_divergence, bce, kl_divergence
+    return cross_entropy_loss + kl_divergence, cross_entropy_loss, kl_divergence
 
 class Encoder(nn.Module):
     def __init__(self,
