@@ -12,6 +12,7 @@ def main():
     csv_file = './username.csv'
     name_file = './name.pkl'
     keymap_file = './keymap.pkl'
+    keyidx_file = './keyidx.pkl'
     dims = 100
 
     all_names = list()
@@ -48,17 +49,23 @@ def main():
     n_chars = dims - 2
     popular_chars = [c[0] for c in all_chars[:n_chars]]
     keymap = dict()
+    keyidx = dict()
 
     for i in range(len(popular_chars)):
         c = popular_chars[i]
         c_onehot = make_onehot(dims, i)
         keymap[c] = c_onehot
+        keyidx[i] = c
 
     keymap['<unk>'] = make_onehot(dims, dims-2)
-    keymap['<pad>'] = make_onehot(dims, dims-2)
+    keymap['<pad>'] = make_onehot(dims, dims-1)
+    keyidx[dims-2] = '<unk>'
+    keyidx[dims-1] = '<pad>'
 
     with open(keymap_file, 'wb') as fd:
         pickle.dump(keymap, fd)
+    with open(keyidx_file, 'wb') as fd:
+        pickle.dump(keyidx, fd)
 
 if __name__ == '__main__':
     main()

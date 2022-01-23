@@ -56,7 +56,7 @@ def main():
             out, _, _, _ = vae(x)
             loss = nn.functional.l1_loss(out, x, reduction='none')
             loss = loss.detach().cpu().numpy()
-            loss = np.sum(loss, axis=(1,2))
+            loss = np.mean(loss, axis=(1,2))
             results.append(loss)
             all_strings.extend(s)
     results = np.concatenate(results, axis=0)
@@ -74,18 +74,6 @@ def main():
         writer.writeheader()
         for item in items:
             writer.writerow(item)
-
-
-
-
-    # idx = np.where(results > np.percentile(results, 99))
-    # output = list()
-    # for i in idx[0]:
-    #     item = (all_strings[i], results[i])
-    #     output.append(item)
-
-    # output = sorted(output, key = lambda x: x[1], reverse=True)
-    # print('\n'.join((f"{x[0]} === {x[1]}" for x in output)))
 
 if __name__ == '__main__':
     main()
