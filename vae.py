@@ -162,6 +162,8 @@ class LSTMVariationalAutoencoder(nn.Module):
         dec = self.__decoder.to('cpu')
         torch.save(enc.state_dict(), encoder_path)
         torch.save(dec.state_dict(), decoder_path)
+        self.__encoder = self.__encoder.to(self.__device)
+        self.__decoder = self.__decoder.to(self.__device)
 
     def load(self, folder='./model'):
         encoder_path = os.path.join(folder, 'encoder.pth')
