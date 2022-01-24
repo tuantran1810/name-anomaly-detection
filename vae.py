@@ -110,6 +110,7 @@ class VariationalCharacterAutoEncoder(nn.Module):
             hidden = torch.permute(hidden, (1,0,2))
         else:
             hidden = hidden.unsqueeze(0)
+        hidden = hidden.contiguous()
 
         # decoder input
         if self.word_dropout_rate > 0:
