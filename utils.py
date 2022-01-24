@@ -3,6 +3,15 @@ sys.path.append(os.path.dirname(__file__))
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+from collections import Counter, OrderedDict
+
+class OrderedCounter(Counter, OrderedDict):
+    """Counter that remembers the order elements are first encountered"""
+    def __repr__(self):
+        return '%s(%r)' % (self.__class__.__name__, OrderedDict(self))
+
+    def __reduce__(self):
+        return self.__class__, (OrderedDict(self),)
 
 class ArrayDataset(Dataset):
     def __init__(self, array, post_processing):

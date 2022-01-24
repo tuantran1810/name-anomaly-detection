@@ -1,193 +1,159 @@
 import sys, os
 sys.path.append(os.path.dirname(__file__))
-from genericpath import exists
 from pathlib import Path
+import numpy as np
 import torch
 from torch import nn
+import torch.nn.utils.rnn as rnn_utils
 
-def vae_loss(x, yhat, z_mean, z_log_var):
-    '''
-    x, yhat:             |    [batchsize, chars, features]
-    z_mean, z_log_var:   |    [batchsize, latent_dims]
-    '''
-    batchsize, chars, features = x.shape
-    x = torch.reshape(x, (batchsize, chars*features))
-    yhat = torch.reshape(yhat, (batchsize, -1))
-    cross_entropy_loss = nn.functional.cross_entropy(yhat, x)
-    kl_divergence = -0.5 * torch.sum(1 + z_log_var - torch.square(z_mean) - torch.exp(z_log_var))
-    return cross_entropy_loss + kl_divergence, cross_entropy_loss, kl_divergence
+def vae_anneal_loss(logp, target, length, mean, logv, step, k=0.0025, x0=2500):
+    # cut-off unnecessary padding from target, and flatten
+    target = target[:, :torch.max(length).item()].contiguous().view(-1)
+    logp = logp.view(-1, logp.size(2))
 
-class Encoder(nn.Module):
-    def __init__(self,
-        input_dims=100,
-        lstm_hidden_dims1=64,
-        lstm_hidden_dims2=32,
-        latent_dims=16,
+    # Negative Log Likelihood
+    nll_loss = nn.functional.nll_loss(logp, target)
+
+    # KL Divergence
+    kl_loss = -0.5 * torch.sum(1 + logv - mean.pow(2) - logv.exp())
+    kl_weight = float(1/(1+np.exp(-k*(step-x0))))
+
+    return nll_loss, kl_loss, kl_weight
+
+class VariationalCharacterAutoEncoder(nn.Module):
+    def __init__(
+        self,
+        special_token_idx, # [sos_idx, eos_idx, pad_idx, unk_idx]
+        vocab_size=142,
+        embedding_size=64,
+        hidden_size=32,
+        word_dropout=0,
+        embedding_dropout=0.5,
+        latent_size=16,
+        max_sequence_length=30,
+        num_layers=1,
+        bidirectional=True,
         device='cpu',
     ):
-        super(Encoder, self).__init__()
-        self.__lstm1 = nn.LSTM(
-            input_size=input_dims,
-            hidden_size=lstm_hidden_dims1,
-            bidirectional=True,
+        super(VariationalCharacterAutoEncoder, self).__init__()
+        self.device = device
+        self.max_sequence_length = max_sequence_length
+        self.sos_idx, self.eos_idx, self.pad_idx, self.unk_idx = special_token_idx
+
+        self.latent_size = latent_size
+
+        self.bidirectional = bidirectional
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+
+        self.embedding = nn.Embedding(vocab_size, embedding_size)
+        self.word_dropout_rate = word_dropout
+        self.embedding_dropout = nn.Dropout(p=embedding_dropout)
+
+        self.encoder_rnn = nn.LSTM(
+            embedding_size,
+            hidden_size,
+            num_layers=num_layers,
+            bidirectional=self.bidirectional,
             batch_first=True,
         )
-        self.__lstm2 = nn.LSTM(
-            input_size=2*lstm_hidden_dims1,
-            hidden_size=lstm_hidden_dims2,
-            bidirectional=True,
+        self.decoder_rnn = nn.LSTM(
+            embedding_size,
+            hidden_size,
+            num_layers=num_layers,
+            bidirectional=self.bidirectional,
             batch_first=True,
         )
-        self.__fc = nn.Linear(2*lstm_hidden_dims2, lstm_hidden_dims2)
-        self.__fc_mean = nn.Linear(lstm_hidden_dims2, latent_dims)
-        self.__fc_log_var = nn.Linear(lstm_hidden_dims2, latent_dims)
 
-        self.to(device)
-        self.__device = device
+        self.hidden_factor = (2 if bidirectional else 1) * num_layers
 
-    def __sampling(self, z_mean, z_log_var):
-        epsilon = torch.normal(0, 1, size=(z_mean.shape)).to(self.__device)
-        return z_mean + torch.exp(z_log_var/2)*epsilon
-
-    def forward(self, x):
-        '''
-        x: [batchsize, chars, features]
-        '''
-        x = x.to(self.__device)
-        x, _ = self.__lstm1(x)
-        x = nn.functional.dropout(x, p=0.2)
-        _, (x, _) = self.__lstm2(x)
-        x = nn.functional.dropout(x, p=0.2)
-        x = torch.permute(x, (1,0,2))
-        x = torch.reshape(x, (x.shape[0], -1))
-        x = self.__fc(x)
-        x = nn.functional.relu(x)
-        x = nn.functional.dropout(x, p=0.2)
-        z_mean = self.__fc_mean(x)
-        z_log_var = self.__fc_log_var(x)
-        z = self.__sampling(z_mean, z_log_var)
-        return (z, z_mean, z_log_var)
-
-class Decoder(nn.Module):
-    def __init__(self,
-        sequence_length = 30,
-        latent_dims=16,
-        lstm_hidden_dims1=32,
-        lstm_hidden_dims2=64,
-        output_dims=100,
-        device='cpu',
-    ):
-        super(Decoder, self).__init__()
-        self.__lstm1 = nn.LSTM(
-            input_size=latent_dims,
-            hidden_size=lstm_hidden_dims1,
-            batch_first=True,
-        )
-        self.__lstm2 = nn.LSTM(
-            input_size=lstm_hidden_dims1,
-            hidden_size=lstm_hidden_dims2,
-            batch_first=True,
-        )
-        self.__fc = nn.Linear(lstm_hidden_dims2, output_dims)
-
-        self.to(device)
-        self.__sequence_length = sequence_length
-        self.__device = device
-
-    # def __lstm1_forward(self, x):
-    #     '''
-    #     x: [batchsize, features]
-    #     '''
-    #     x = torch.unsqueeze(x, dim=1)
-    #     hidden = None
-    #     out = list()
-    #     for _ in range(self.__sequence_length):
-    #         x, hidden = self.__lstm1(x, hidden)
-    #         out.append(x)
-    #     x = torch.cat(out, dim=1)
-    #     return x
-
-    def forward(self, x):
-        '''
-        x: [batchsize, features]
-        '''
-        x = x.to(self.__device)
-        x = torch.unsqueeze(x, dim=1)
-        x = x.repeat((1, self.__sequence_length, 1))
-        x, _ = self.__lstm1(x)
-        x = nn.functional.dropout(x, p=0.2)
-        x, _ = self.__lstm2(x)
-        x = nn.functional.dropout(x, p=0.2)
-        x = self.__fc(x)
-        x = torch.nn.functional.softmax(x, dim=2)
-        return x
-
-class LSTMVariationalAutoencoder(nn.Module):
-    def __init__(self,
-        sequence_length = 30,
-        feature_dims=100,
-        lstm_hidden_dims1=64,
-        lstm_hidden_dims2=32,
-        latent_dims=16,
-        device='cpu',
-    ):
-        super(LSTMVariationalAutoencoder, self).__init__()
-        self.__encoder = Encoder(
-            input_dims=feature_dims,
-            lstm_hidden_dims1=lstm_hidden_dims1,
-            lstm_hidden_dims2=lstm_hidden_dims2,
-            latent_dims=latent_dims,
-            device=device,
-        )
-        self.__decoder = Decoder(
-            sequence_length=sequence_length,
-            latent_dims=latent_dims,
-            lstm_hidden_dims1=lstm_hidden_dims2,
-            lstm_hidden_dims2=lstm_hidden_dims1,
-            output_dims=feature_dims,
-            device=device,
-        )
-        self.__device = device
+        self.hidden2mean = nn.Linear(hidden_size * self.hidden_factor, latent_size)
+        self.hidden2logv = nn.Linear(hidden_size * self.hidden_factor, latent_size)
+        self.latent2hidden = nn.Linear(latent_size, hidden_size * self.hidden_factor)
+        self.outputs2vocab = nn.Linear(hidden_size * (2 if bidirectional else 1), vocab_size)
+        
         self.to(device)
 
-    def forward(self, x):
-        '''
-        x: [batchsize, chars, features]
-        '''
-        x = x.to(self.__device)
-        z, z_mean, z_log_var = self.__encoder(x)
-        out = self.__decoder(z)
-        return out, z, z_mean, z_log_var
+    def forward(self, input_sequence, length):
+        input_sequence = input_sequence.to(self.device)
+        length = length.to(self.device)
 
-    @property
-    def encoder(self):
-        return self.__encoder
+        batch_size = input_sequence.size(0)
+        sorted_lengths, sorted_idx = torch.sort(length, descending=True)
+        input_sequence = input_sequence[sorted_idx]
 
-    @property
-    def decoder(self):
-        return self.__decoder
+        # ENCODER
+        input_embedding = self.embedding(input_sequence)
+        packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True)
+        _, (hidden, _) = self.encoder_rnn(packed_input)
+
+        if self.bidirectional or self.num_layers > 1:
+            # flatten hidden state
+            hidden = torch.permute(hidden, (1,0,2))
+            hidden = hidden.reshape(batch_size, self.hidden_size*self.hidden_factor)
+        else:
+            hidden = hidden.squeeze()
+
+        # # REPARAMETERIZATION
+        mean = self.hidden2mean(hidden)
+        logv = self.hidden2logv(hidden)
+        std = torch.exp(0.5 * logv)
+        z = torch.randn([batch_size, self.latent_size]).to(self.device)
+        z = z * std + mean
+
+        # # DECODER
+        hidden = self.latent2hidden(z)
+
+        if self.bidirectional or self.num_layers > 1:
+            # unflatten hidden state
+            hidden = hidden.reshape(batch_size, self.hidden_factor, self.hidden_size)
+            hidden = torch.permute(hidden, (1,0,2))
+        else:
+            hidden = hidden.unsqueeze(0)
+
+        # decoder input
+        if self.word_dropout_rate > 0:
+            # randomly replace decoder input with <unk>
+            prob = torch.rand(input_sequence.size())
+            if torch.cuda.is_available():
+                prob=prob.cuda()
+            prob[(input_sequence.data - self.sos_idx) * (input_sequence.data - self.pad_idx) == 0] = 1
+            decoder_input_sequence = input_sequence.clone()
+            decoder_input_sequence[prob < self.word_dropout_rate] = self.unk_idx
+            input_embedding = self.embedding(decoder_input_sequence)
+        input_embedding = self.embedding_dropout(input_embedding)
+        packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True)
+
+        # # decoder forward pass
+        outputs, _ = self.decoder_rnn(packed_input, (hidden, torch.zeros_like(hidden).to(self.device)))
+
+        # # process outputs
+        padded_outputs = rnn_utils.pad_packed_sequence(outputs, batch_first=True)[0]
+        padded_outputs = padded_outputs.contiguous()
+        _,reversed_idx = torch.sort(sorted_idx)
+        padded_outputs = padded_outputs[reversed_idx]
+        b, s, _ = padded_outputs.size()
+
+        # # project outputs to vocab
+        logp = nn.functional.log_softmax(self.outputs2vocab(padded_outputs.view(-1, padded_outputs.size(2))), dim=-1)
+        logp = logp.view(b, s, self.embedding.num_embeddings)
+
+        return logp, mean, logv, z
 
     def save(self, folder='./model'):
         Path(folder).mkdir(exist_ok=True, parents=True)
-        encoder_path = os.path.join(folder, 'encoder.pth')
-        decoder_path = os.path.join(folder, 'decoder.pth')
-        enc = self.__encoder.to('cpu')
-        dec = self.__decoder.to('cpu')
-        torch.save(enc.state_dict(), encoder_path)
-        torch.save(dec.state_dict(), decoder_path)
-        self.__encoder = self.__encoder.to(self.__device)
-        self.__decoder = self.__decoder.to(self.__device)
+        path = os.path.join(folder, 'model.pth')
+        torch.save(self.state_dict(), path)
 
     def load(self, folder='./model'):
-        encoder_path = os.path.join(folder, 'encoder.pth')
-        decoder_path = os.path.join(folder, 'decoder.pth')
-        self.__encoder.load_state_dict(torch.load(encoder_path))
-        self.__decoder.load_state_dict(torch.load(decoder_path))
-        self.to(self.__device)
+        path = os.path.join(folder, 'model.pth')
+        self.load_state_dict(torch.load(path, map_location=self.device))
+        self.to(self.device)
 
 if __name__ == '__main__':
-    vae = LSTMVariationalAutoencoder()
-    x = torch.zeros(4, 30, 100)
-    out, z, z_mean, z_log_var = vae(x)
-    loss = vae_loss(x, out, z_mean, z_log_var)
-    vae.save()
+    vae = VariationalCharacterAutoEncoder([0,1,2,3])
+    x = torch.zeros(5, 30).long()
+    length = torch.tensor([x+10 for x in range(5)])
+    logp, mean, logv, z = vae(x, length)
+    nll_loss, kl_loss, kl_weight = vae_anneal_loss(logp, torch.zeros(5, 30).long(), length, mean, logv, 1000)
+    print(nll_loss, kl_loss, kl_weight)

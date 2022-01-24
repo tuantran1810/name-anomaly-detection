@@ -1,70 +1,71 @@
-import pickle
-import random
 import csv
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 import numpy as np
-from utils import ArrayDataset, TensorMaker
-from vae import LSTMVariationalAutoencoder
-from sklearn.decomposition import PCA
-from matplotlib import pyplot as plt
+from vae import VariationalCharacterAutoEncoder, vae_anneal_loss
+from vocab import PTB
 from tqdm import tqdm
 
 sequence_length = 30
-feature_dims = 100
-lstm_hidden_dims1 = 128
-lstm_hidden_dims2 = 64
-latent_dims = 32
-device = 'cpu'
+embedding_size = 64
+hidden_size = 64
+latent_size = 16
+embedding_dropout = 0.5
+batchsize = 256
+device='cpu'
 
 def main():
-    all_names = None
-    keymap = None
-    keyidx = None
-    with open('./name.pkl', 'rb') as fd:
-        all_names = pickle.load(fd)
-    with open('./keymap.pkl', 'rb') as fd:
-        keymap = pickle.load(fd)
-    with open('./keyidx.pkl', 'rb') as fd:
-        keyidx = pickle.load(fd)
+    ptb = PTB(
+        part='test',
+        vocab_file='./data/vocab.pkl',
+        data_dir='./data/token.pkl',
+        max_sequence_length=sequence_length,
+    )
 
-    all_names = all_names['test']
-    random.shuffle(all_names)
-    tensor_maker = TensorMaker(keymap, sequence_length)
-    dataset = ArrayDataset(all_names, tensor_maker.make)
     params = {
-        'batch_size': 512,
+        'batch_size': 256,
         'shuffle': False,
         'num_workers': 2,
         'drop_last': False,
     }
-    dataloader = DataLoader(dataset, **params)
+    dataloader = DataLoader(ptb, **params)
 
-    vae = LSTMVariationalAutoencoder(
-        sequence_length=sequence_length,
-        feature_dims=feature_dims,
-        lstm_hidden_dims1=lstm_hidden_dims1,
-        lstm_hidden_dims2=lstm_hidden_dims2,
-        latent_dims=latent_dims,
-        device='cpu',
+    vae = VariationalCharacterAutoEncoder(
+        [ptb.sos_idx, ptb.eos_idx, ptb.pad_idx, ptb.unk_idx],
+        vocab_size=ptb.vocab_size,
+        embedding_size=embedding_size,
+        hidden_size=hidden_size,
+        embedding_dropout=embedding_dropout,
+        latent_size=latent_size,
+        max_sequence_length=sequence_length,
+        device=device
     )
-    vae.load(folder='./model/celoss')
+    vae.load(folder='./model/0')
     vae.eval()
 
     results = list()
     all_strings = list()
-    for s, x in tqdm(dataloader):
+    for string, x, y, length in tqdm(dataloader):
+        x = x.to(device)
+        y = y.to(device)
+        length = length.to(device)
         with torch.no_grad():
-            out, _, _, _ = vae(x)
-            loss = nn.functional.l1_loss(out, x, reduction='none')
+            logp, mean, logv, z = vae(x, length)
+            max_length = torch.max(length).item()
+            y = y[:, :max_length].contiguous().view(-1)
+            logp = logp.view(-1, logp.size(2))
+            loss = nn.functional.nll_loss(logp, y, reduction='none')
+            loss = loss.reshape(-1, max_length)
+            loss = torch.mean(loss, dim=1)
             loss = loss.detach().cpu().numpy()
-            loss = np.mean(loss, axis=(1,2))
             results.append(loss)
-            all_strings.extend(s)
+            all_strings.extend(string)
     results = np.concatenate(results, axis=0)
 
     items = list()
+    print(len(results))
+    print(len(all_strings))
     for i in range(len(results)):
         result = results[i]
         string = all_strings[i]
