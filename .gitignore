@@ -132,4 +132,5 @@ model/
 log/
 samples/
 test_result.csv
+data/user-email.csv
 .DS_Store

@@ -6,6 +6,7 @@ import numpy as np
 from vae import VariationalCharacterAutoEncoder, vae_loss
 from vocab import PTB
 from tqdm import tqdm
+from matplotlib import pyplot as plt
 
 sequence_length = 30
 embedding_size = 64
@@ -41,10 +42,10 @@ def main():
         max_sequence_length=sequence_length,
         device=device
     )
-    vae.load(folder='./model/18')
+    vae.load(folder='./model/20')
     vae.eval()
 
-    loss_lst = list()
+    trust_lst = list()
     all_strings = list()
     for string, x, y, length in tqdm(dataloader):
         x = x.to(device)
@@ -53,25 +54,32 @@ def main():
         with torch.no_grad():
             logp, mean, logv, z = vae(x, length)
             loss, _ = vae_loss(logp, y, length, mean, logv, reduction='none')
-            loss_lst.append(loss.detach().cpu().numpy())
+            loss = loss.detach().cpu().numpy()
+            trust = -np.log(loss + 10e-12)
+            trust_lst.append(trust)
             all_strings.extend(string)
-    loss_lst = np.concatenate(loss_lst, axis=0)
+    trust_lst = np.concatenate(trust_lst, axis=0)
 
     items = list()
-    for i in range(len(loss_lst)):
+    for i in range(len(trust_lst)):
 
         items.append({
             'name': all_strings[i],
-            'loss': loss_lst[i],
+            'trust': trust_lst[i],
         })
-    items = sorted(items, key=lambda x: x['loss'], reverse=True)
+    items = sorted(items, key=lambda x: x['trust'])
 
     with open('./test_result.csv', 'w', newline='') as fd:
-        fields = ['name', 'loss']
+        fields = ['name', 'trust']
         writer = csv.DictWriter(fd, fieldnames=fields)
         writer.writeheader()
         for item in items:
             writer.writerow(item)
+
+    plt.figure()
+    plt.hist(sorted(trust_lst)[:7500], bins=200)
+    plt.show()
+    plt.close()
 
 if __name__ == '__main__':
     main()
