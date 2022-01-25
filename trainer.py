@@ -99,7 +99,7 @@ class Trainer():
                     logp, mean, logv, z = self.__vae(x, length)
                     nll_loss, kl_loss, kl_weight = vae_anneal_loss(logp, y, length, mean, logv, ipoint)
                     kl_loss = kl_weight * kl_loss
-                    loss = (nll_loss + kl_loss) / batchsize
+                    loss = nll_loss + kl_loss
                     val_loss.append(loss)
             self.__writer.add_scalar('validation_loss', sum(val_loss)/len(val_loss), epoch)
             self.__vae.save(folder=os.path.join(self.__output_model_path, str(epoch)))
