@@ -9,8 +9,8 @@ def make_onehot(dims, i):
     return vector
 
 def main():
-    csv_file = './data/username.csv'
-    name_file = './data/name.pkl'
+    csv_file = './data/username/username.csv'
+    name_file = './data/username/name.pkl'
 
     all_names = list()
     with open(csv_file) as fd:

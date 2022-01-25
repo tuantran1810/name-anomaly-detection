@@ -132,5 +132,5 @@ model/
 log/
 samples/
 test_result.csv
-data/user-email.csv
+data/useradd/useradd.csv
 .DS_Store
