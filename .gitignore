@@ -132,5 +132,5 @@ model/
 log/
 samples/
 test_result.csv
-data/useradd/useradd.csv
+data/useradd/*
 .DS_Store

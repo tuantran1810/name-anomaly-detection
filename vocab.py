@@ -151,6 +151,21 @@ class PTB(Dataset):
         self._load_vocab()
 
 if __name__ == '__main__':
-    ptb = PTB()
-    print(ptb.vocab_size)
-    print(ptb.get_w2i())
+    # ptb = PTB(
+    #     part='train',
+    #     raw_data_dir='./data/username/name.pkl',
+    #     vocab_file='./data/username/vocab.pkl',
+    #     data_dir='./data/username/token.pkl',
+    #     max_sequence_length=30,
+    #     min_ooc=50,
+    # )
+
+    # ptb = PTB(
+    #     part='train',
+    #     raw_data_dir='./data/useradd/add.pkl',
+    #     vocab_file='./data/useradd/vocab.pkl',
+    #     data_dir='./data/useradd/token.pkl',
+    #     max_sequence_length=30,
+    #     min_ooc=50,
+    # )
+    pass
