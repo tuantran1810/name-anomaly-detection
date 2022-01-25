@@ -132,3 +132,4 @@ model/
 log/
 samples/
 test_result.csv
+.DS_Store

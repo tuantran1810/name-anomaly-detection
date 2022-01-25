@@ -16,7 +16,7 @@ class Trainer():
         sequence_length=30,
         embedding_size=64,
         hidden_size=64,
-        latent_size=16,
+        latent_size=32,
         embedding_dropout=0.5,
         batchsize=256,
         lr=10e-4,

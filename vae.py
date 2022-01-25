@@ -6,18 +6,30 @@ import torch
 from torch import nn
 import torch.nn.utils.rnn as rnn_utils
 
-def vae_anneal_loss(logp, target, length, mean, logv, step, k=0.0025, x0=2500):
+def vae_loss(logp, target, length, mean, logv, reduction='mean'):
     # cut-off unnecessary padding from target, and flatten
-    target = target[:, :torch.max(length).item()].contiguous().view(-1)
+    max_length = torch.max(length).item()
+    target = target[:, :max_length].contiguous().view(-1)
     logp = logp.view(-1, logp.size(2))
 
     # Negative Log Likelihood
-    nll_loss = nn.functional.nll_loss(logp, target)
+    nll_loss = nn.functional.nll_loss(logp, target, reduction=reduction)
+    if reduction == 'none':
+        nll_loss = nll_loss.reshape(-1, max_length)
+        nll_loss = torch.mean(nll_loss, dim=1)
 
     # KL Divergence
-    kl_loss = -0.5 * torch.sum(1 + logv - mean.pow(2) - logv.exp())
-    kl_weight = float(1/(1+np.exp(-k*(step-x0))))
+    kl_loss = None
+    if reduction == 'none':
+        kl_loss = -0.5 * torch.sum(1 + logv - mean.pow(2) - logv.exp(), dim=1)
+    else:
+        kl_loss = -0.5 * torch.sum(1 + logv - mean.pow(2) - logv.exp())
 
+    return nll_loss, kl_loss
+
+def vae_anneal_loss(logp, target, length, mean, logv, step, k=0.025, x0=2500):
+    nll_loss, kl_loss = vae_loss(logp, target, length, mean, logv)
+    kl_weight = float(1/(1+np.exp(-k*(step-x0))))
     return nll_loss, kl_loss, kl_weight
 
 class VariationalCharacterAutoEncoder(nn.Module):
