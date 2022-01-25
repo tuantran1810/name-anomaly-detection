@@ -86,6 +86,7 @@ class Trainer():
 
                 self.__writer.add_scalar('training_loss/nll_loss', nll_loss, ipoint)
                 self.__writer.add_scalar('training_loss/kl_loss', kl_loss, ipoint)
+                self.__writer.add_scalar('training_loss/kl_weight', kl_weight, ipoint)
                 self.__writer.add_scalar('training_loss/loss', loss, ipoint)
 
             self.__vae.eval()
