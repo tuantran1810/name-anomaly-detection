@@ -80,7 +80,7 @@ class Trainer():
                 logp, mean, logv, z = self.__vae(x, length)
                 nll_loss, kl_loss, kl_weight = vae_anneal_loss(logp, y, length, mean, logv, ipoint)
                 kl_loss = kl_weight * kl_loss
-                loss = (nll_loss + kl_loss) / batchsize
+                loss = nll_loss + kl_loss
                 loss.backward()
                 self.__optim.step()
 
