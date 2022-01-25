@@ -41,7 +41,7 @@ def main():
         max_sequence_length=sequence_length,
         device=device
     )
-    vae.load(folder='./model/20')
+    vae.load(folder='./model/18')
     vae.eval()
 
     loss_lst = list()

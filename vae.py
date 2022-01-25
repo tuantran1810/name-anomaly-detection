@@ -27,7 +27,7 @@ def vae_loss(logp, target, length, mean, logv, reduction='mean'):
 
     return nll_loss, kl_loss
 
-def vae_anneal_loss(logp, target, length, mean, logv, step, k=0.025, x0=2500):
+def vae_anneal_loss(logp, target, length, mean, logv, step, k=0.0025, x0=2500):
     nll_loss, kl_loss = vae_loss(logp, target, length, mean, logv)
     kl_weight = float(1/(1+np.exp(-k*(step-x0))))
     return nll_loss, kl_loss, kl_weight
