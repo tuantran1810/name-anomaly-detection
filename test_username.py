@@ -19,8 +19,8 @@ device='cpu'
 def main():
     ptb = PTB(
         part='test',
-        vocab_file='./data/vocab.pkl',
-        data_dir='./data/token.pkl',
+        vocab_file='./data/username/vocab.pkl',
+        data_dir='./data/username/token.pkl',
         max_sequence_length=sequence_length,
     )
 
@@ -42,7 +42,7 @@ def main():
         max_sequence_length=sequence_length,
         device=device
     )
-    vae.load(folder='./model/20')
+    vae.load(folder='./model/username/20')
     vae.eval()
 
     trust_lst = list()
