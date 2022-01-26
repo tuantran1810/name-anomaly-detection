@@ -128,9 +128,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-model/
 log/
 samples/
 test_result.csv
-data/useradd/*
 .DS_Store
