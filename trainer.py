@@ -108,25 +108,10 @@ class Trainer():
         self.__vae.save(folder=self.__output_model_path)
 
 if __name__ == '__main__':
-    # trainer = Trainer(
-    #     token_pkl_path='./data/username/token.pkl',
-    #     vocab_pkl_path='./data/username/vocab.pkl',
-    #     output_model_path='./model/username',
-    #     log_dir='./log',
-    #     sequence_length=30,
-    #     embedding_size=64,
-    #     hidden_size=64,
-    #     latent_size=32,
-    #     embedding_dropout=0.5,
-    #     batchsize=256,
-    #     lr=10e-4,
-    #     device='cpu',
-    # )
-
     trainer = Trainer(
-        token_pkl_path='./data/useradd/token.pkl',
-        vocab_pkl_path='./data/useradd/vocab.pkl',
-        output_model_path='./model/useradd',
+        token_pkl_path='./data/username/token.pkl',
+        vocab_pkl_path='./data/username/vocab.pkl',
+        output_model_path='./model/username',
         log_dir='./log',
         sequence_length=30,
         embedding_size=64,

@@ -159,13 +159,4 @@ if __name__ == '__main__':
     #     max_sequence_length=30,
     #     min_ooc=50,
     # )
-
-    # ptb = PTB(
-    #     part='train',
-    #     raw_data_dir='./data/useradd/add.pkl',
-    #     vocab_file='./data/useradd/vocab.pkl',
-    #     data_dir='./data/useradd/token.pkl',
-    #     max_sequence_length=30,
-    #     min_ooc=50,
-    # )
     pass
