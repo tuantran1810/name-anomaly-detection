@@ -132,3 +132,5 @@ log/
 samples/
 test_result.csv
 .DS_Store
+data/username/name.pkl
+data/username/token.pkl
