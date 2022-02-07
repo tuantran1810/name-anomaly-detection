@@ -17,6 +17,7 @@ class PTB(Dataset):
         data_dir='./data/token.pkl',
         max_sequence_length=30,
         min_ooc=50,
+        infer_mode=False,
     ):
         super().__init__()
         self.raw_data_dir = raw_data_dir
@@ -25,6 +26,11 @@ class PTB(Dataset):
         self.max_sequence_length = max_sequence_length
         self.min_occ = min_ooc
         self.vocab_file = vocab_file
+
+        if infer_mode:
+            print(f"PTB runs in inference mode, with the vocab at: {vocab_file}")
+            self._load_vocab()
+            return
 
         if not os.path.exists(data_dir) or not os.path.exists(vocab_file):
             print("create new data and vocab")
@@ -80,6 +86,10 @@ class PTB(Dataset):
             vocab = pickle.load(fd)
 
         self.w2i, self.i2w = vocab['w2i'], vocab['i2w']
+
+    def create_inference_data(self, name):
+        item = self.__create_data_item(name)
+        return np.asarray(item['input']), np.asarray(item['target'])
 
     def __create_data_item(self, name):
         chars = [c for c in name]
@@ -158,5 +168,6 @@ if __name__ == '__main__':
     #     data_dir='./data/username/token.pkl',
     #     max_sequence_length=30,
     #     min_ooc=50,
+    #     infer_mode=False,
     # )
     pass
